@@ -130,6 +130,18 @@ export async function analyzeNDA(documentText: string): Promise<AnalysisResult> 
     return object as AnalysisResult
   } catch (error) {
     console.error('Error analyzing NDA:', error)
+    
+    // Provide more specific error messages
+    if (error instanceof Error) {
+      if (error.message.includes('network') || error.message.includes('fetch')) {
+        throw new Error('Network error occurred. Please check your connection and try again.')
+      } else if (error.message.includes('rate limit')) {
+        throw new Error('Too many requests. Please wait a moment and try again.')
+      } else if (error.message.includes('authentication')) {
+        throw new Error('Authentication error. Please sign in again.')
+      }
+    }
+    
     throw new Error('Failed to analyze NDA. Please try again.')
   }
 }
