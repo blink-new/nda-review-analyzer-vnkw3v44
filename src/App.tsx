@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { Upload, FileText, AlertTriangle, CheckCircle, XCircle, Copy, Download, Mail } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { Upload, FileText, AlertTriangle, CheckCircle, XCircle, Copy, Download, Mail, Loader2 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card'
 import { Button } from './components/ui/button'
 import { Badge } from './components/ui/badge'
@@ -8,147 +8,130 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './
 import { Alert, AlertDescription } from './components/ui/alert'
 import { Progress } from './components/ui/progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs'
-import { Separator } from './components/ui/separator'
-
-interface AnalysisResult {
-  recommendation: 'SIGN' | 'DO_NOT_SIGN' | 'SIGN_WITH_AMENDMENTS'
-  riskScore: number
-  keyConcerns: string[]
-  clauses: ClauseAnalysis[]
-  emailTemplate: string
-}
-
-interface ClauseAnalysis {
-  id: string
-  name: string
-  issue: string
-  currentLanguage: string
-  recommendedAction: 'Remove' | 'Amend' | 'Add'
-  suggestedLanguage: string
-  whyItMatters: string
-  riskLevel: 'High' | 'Medium' | 'Low'
-}
+import { useToast } from './hooks/use-toast'
+import { Toaster } from './components/ui/toaster'
+import { blink } from './blink/client'
+import { analyzeNDA, extractTextFromFile, type AnalysisResult } from './services/ndaAnalysis'
 
 function App() {
+  const [user, setUser] = useState(null)
+  const [authLoading, setAuthLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('upload')
   const [documentText, setDocumentText] = useState('')
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisProgress, setAnalysisProgress] = useState(0)
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
+  const [isDragOver, setIsDragOver] = useState(false)
+  const { toast } = useToast()
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Auth state management
+  useEffect(() => {
+    const unsubscribe = blink.auth.onAuthStateChanged((state) => {
+      setUser(state.user)
+      setAuthLoading(state.isLoading)
+    })
+    return unsubscribe
+  }, [])
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
-      // Simulate file reading
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        setDocumentText(e.target?.result as string)
+      try {
+        const extractedText = await extractTextFromFile(file)
+        setDocumentText(extractedText)
+        toast({
+          title: "File uploaded successfully",
+          description: `Extracted text from ${file.name}`,
+        })
+      } catch (error) {
+        toast({
+          title: "Error uploading file",
+          description: error instanceof Error ? error.message : "Failed to process file",
+          variant: "destructive"
+        })
       }
-      reader.readAsText(file)
     }
   }
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
+    setIsDragOver(true)
   }
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault()
+    setIsDragOver(false)
+  }
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+    
     const files = e.dataTransfer.files
     if (files.length > 0) {
       const file = files[0]
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        setDocumentText(e.target?.result as string)
+      try {
+        const extractedText = await extractTextFromFile(file)
+        setDocumentText(extractedText)
+        toast({
+          title: "File uploaded successfully",
+          description: `Extracted text from ${file.name}`,
+        })
+      } catch (error) {
+        toast({
+          title: "Error uploading file",
+          description: error instanceof Error ? error.message : "Failed to process file",
+          variant: "destructive"
+        })
       }
-      reader.readAsText(file)
     }
   }
 
   const analyzeDocument = async () => {
-    if (!documentText.trim()) return
+    if (!documentText.trim()) {
+      toast({
+        title: "No document to analyze",
+        description: "Please upload a document or paste text first",
+        variant: "destructive"
+      })
+      return
+    }
 
     setIsAnalyzing(true)
     setAnalysisProgress(0)
     setActiveTab('results')
 
-    // Simulate analysis progress
+    // Simulate progress updates
     const progressInterval = setInterval(() => {
       setAnalysisProgress(prev => {
-        if (prev >= 100) {
+        if (prev >= 90) {
           clearInterval(progressInterval)
-          return 100
+          return 90
         }
-        return prev + 10
+        return prev + Math.random() * 15
       })
-    }, 200)
+    }, 500)
 
-    // Simulate analysis delay
-    setTimeout(() => {
-      const mockResult: AnalysisResult = {
-        recommendation: 'SIGN_WITH_AMENDMENTS',
-        riskScore: 6,
-        keyConcerns: [
-          'Missing mutual confidentiality provisions',
-          'Overly broad definition of confidential information',
-          'No time limit on confidentiality obligations',
-          'Inadequate return/destruction clause'
-        ],
-        clauses: [
-          {
-            id: '1',
-            name: 'Confidentiality Definition',
-            issue: 'The definition of confidential information is too broad and could include publicly available information',
-            currentLanguage: '"Confidential Information" means any and all information disclosed by either party.',
-            recommendedAction: 'Amend',
-            suggestedLanguage: '"Confidential Information" means information that is marked as confidential or would reasonably be considered confidential by a reasonable person.',
-            whyItMatters: 'A broad definition could make you liable for protecting information that should be public',
-            riskLevel: 'High'
-          },
-          {
-            id: '2',
-            name: 'Term Duration',
-            issue: 'No specified end date for confidentiality obligations',
-            currentLanguage: 'The obligations under this Agreement shall survive indefinitely.',
-            recommendedAction: 'Amend',
-            suggestedLanguage: 'The obligations under this Agreement shall survive for a period of 5 years from the date of disclosure.',
-            whyItMatters: 'Indefinite obligations create ongoing legal risk without clear endpoint',
-            riskLevel: 'Medium'
-          },
-          {
-            id: '3',
-            name: 'Return of Information',
-            issue: 'Vague requirements for returning confidential information',
-            currentLanguage: 'Upon request, the receiving party shall return all confidential information.',
-            recommendedAction: 'Amend',
-            suggestedLanguage: 'Upon written request or termination of discussions, the receiving party shall promptly return or destroy all confidential information and provide written certification of compliance.',
-            whyItMatters: 'Clear return procedures protect both parties and provide closure',
-            riskLevel: 'Low'
-          }
-        ],
-        emailTemplate: `Subject: NDA Review - Requested Amendments
-
-Dear [Contact],
-
-After reviewing the proposed NDA, I have identified the following items that require amendment before signing:
-
-1. **Confidentiality Definition (Section X)**: The current definition is overly broad. Please revise to: "Confidential Information means information that is marked as confidential or would reasonably be considered confidential by a reasonable person."
-
-2. **Term Duration (Section Y)**: Please add a specific time limit: "The obligations under this Agreement shall survive for a period of 5 years from the date of disclosure."
-
-3. **Return of Information (Section Z)**: Please clarify the return process: "Upon written request or termination of discussions, the receiving party shall promptly return or destroy all confidential information and provide written certification of compliance."
-
-Please let me know if you have any questions about these requested changes.
-
-Best regards,
-[Your name]`
-      }
-
-      setAnalysisResult(mockResult)
+    try {
+      const result = await analyzeNDA(documentText)
+      setAnalysisResult(result)
+      setAnalysisProgress(100)
+      
+      toast({
+        title: "Analysis complete",
+        description: `Recommendation: ${result.recommendation.replace(/_/g, ' ')}`,
+      })
+    } catch (error) {
+      toast({
+        title: "Analysis failed",
+        description: error instanceof Error ? error.message : "Failed to analyze document",
+        variant: "destructive"
+      })
+      setActiveTab('upload')
+    } finally {
       setIsAnalyzing(false)
       clearInterval(progressInterval)
-      setAnalysisProgress(100)
-    }, 3000)
+    }
   }
 
   const getRiskColor = (level: string) => {
@@ -178,8 +161,60 @@ Best regards,
     }
   }
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text)
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      toast({
+        title: "Copied to clipboard",
+        description: "Text has been copied successfully",
+      })
+    } catch (error) {
+      toast({
+        title: "Failed to copy",
+        description: "Could not copy text to clipboard",
+        variant: "destructive"
+      })
+    }
+  }
+
+  // Show loading screen while auth is initializing
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show sign-in prompt if not authenticated
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="bg-blue-600 p-3 rounded-lg w-fit mx-auto mb-4">
+              <FileText className="h-8 w-8 text-white" />
+            </div>
+            <CardTitle className="text-2xl">NDA Review Analyzer</CardTitle>
+            <CardDescription>
+              Sign in to analyze your Non-Disclosure Agreements with AI
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button 
+              onClick={() => blink.auth.login()} 
+              className="w-full bg-blue-600 hover:bg-blue-700"
+              size="lg"
+            >
+              Sign In to Continue
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -196,6 +231,16 @@ Best regards,
                 <h1 className="text-2xl font-bold text-gray-900">NDA Review Analyzer</h1>
                 <p className="text-sm text-gray-600">Smart legal document analysis for non-lawyers</p>
               </div>
+            </div>
+            <div className="flex items-center space-x-4">
+              <span className="text-sm text-gray-600">Welcome, {user.email}</span>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => blink.auth.logout()}
+              >
+                Sign Out
+              </Button>
             </div>
           </div>
         </div>
@@ -220,11 +265,16 @@ Best regards,
               <CardContent className="space-y-6">
                 {/* File Upload */}
                 <div
-                  className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors"
+                  className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-200 ${
+                    isDragOver 
+                      ? 'border-blue-400 bg-blue-50' 
+                      : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'
+                  }`}
                   onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
                 >
-                  <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <Upload className={`h-12 w-12 mx-auto mb-4 ${isDragOver ? 'text-blue-500' : 'text-gray-400'}`} />
                   <p className="text-lg font-medium text-gray-900 mb-2">
                     Drag and drop your NDA here
                   </p>
@@ -270,7 +320,14 @@ Best regards,
                   className="w-full bg-blue-600 hover:bg-blue-700"
                   size="lg"
                 >
-                  {isAnalyzing ? 'Analyzing...' : 'Analyze NDA'}
+                  {isAnalyzing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Analyzing...
+                    </>
+                  ) : (
+                    'Analyze NDA'
+                  )}
                 </Button>
               </CardContent>
             </Card>
@@ -282,8 +339,8 @@ Best regards,
                 <CardContent className="pt-6">
                   <div className="space-y-4">
                     <div className="flex items-center space-x-3">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                      <span className="text-lg font-medium">Analyzing your NDA...</span>
+                      <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                      <span className="text-lg font-medium">Analyzing your NDA with AI...</span>
                     </div>
                     <Progress value={analysisProgress} className="w-full" />
                     <p className="text-sm text-gray-600">
@@ -330,83 +387,87 @@ Best regards,
                     </div>
 
                     {/* Key Concerns */}
-                    <div>
-                      <h3 className="text-lg font-semibold mb-3">Key Concerns</h3>
-                      <ul className="space-y-2">
-                        {analysisResult.keyConcerns.map((concern, index) => (
-                          <li key={index} className="flex items-start space-x-2">
-                            <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5 flex-shrink-0" />
-                            <span className="text-gray-700">{concern}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                    {analysisResult.keyConcerns.length > 0 && (
+                      <div>
+                        <h3 className="text-lg font-semibold mb-3">Key Concerns</h3>
+                        <ul className="space-y-2">
+                          {analysisResult.keyConcerns.map((concern, index) => (
+                            <li key={index} className="flex items-start space-x-2">
+                              <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5 flex-shrink-0" />
+                              <span className="text-gray-700">{concern}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
                 {/* Detailed Analysis */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Detailed Clause Analysis</CardTitle>
-                    <CardDescription>
-                      Click on each clause to see detailed recommendations
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Accordion type="single" collapsible className="w-full">
-                      {analysisResult.clauses.map((clause) => (
-                        <AccordionItem key={clause.id} value={clause.id}>
-                          <AccordionTrigger className="text-left">
-                            <div className="flex items-center space-x-3">
-                              <Badge className={getRiskColor(clause.riskLevel)}>
-                                {clause.riskLevel}
-                              </Badge>
-                              <span className="font-medium">{clause.name}</span>
-                            </div>
-                          </AccordionTrigger>
-                          <AccordionContent className="space-y-4">
-                            <Alert>
-                              <AlertTriangle className="h-4 w-4" />
-                              <AlertDescription>
-                                <strong>Issue:</strong> {clause.issue}
-                              </AlertDescription>
-                            </Alert>
+                {analysisResult.clauses.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Detailed Clause Analysis</CardTitle>
+                      <CardDescription>
+                        Click on each clause to see detailed recommendations
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Accordion type="single" collapsible className="w-full">
+                        {analysisResult.clauses.map((clause) => (
+                          <AccordionItem key={clause.id} value={clause.id}>
+                            <AccordionTrigger className="text-left">
+                              <div className="flex items-center space-x-3">
+                                <Badge className={getRiskColor(clause.riskLevel)}>
+                                  {clause.riskLevel}
+                                </Badge>
+                                <span className="font-medium">{clause.name}</span>
+                              </div>
+                            </AccordionTrigger>
+                            <AccordionContent className="space-y-4">
+                              <Alert>
+                                <AlertTriangle className="h-4 w-4" />
+                                <AlertDescription>
+                                  <strong>Issue:</strong> {clause.issue}
+                                </AlertDescription>
+                              </Alert>
 
-                            <div className="space-y-3">
-                              <div>
-                                <h4 className="font-medium text-red-700 mb-2">❌ Current Language:</h4>
-                                <div className="bg-red-50 p-3 rounded border border-red-200">
-                                  <p className="text-sm italic">"{clause.currentLanguage}"</p>
+                              <div className="space-y-3">
+                                <div>
+                                  <h4 className="font-medium text-red-700 mb-2">❌ Current Language:</h4>
+                                  <div className="bg-red-50 p-3 rounded border border-red-200">
+                                    <p className="text-sm italic">"{clause.currentLanguage}"</p>
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <h4 className="font-medium text-blue-700 mb-2">✅ Recommended Action: {clause.recommendedAction}</h4>
+                                  <div className="bg-blue-50 p-3 rounded border border-blue-200">
+                                    <p className="text-sm">"{clause.suggestedLanguage}"</p>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="mt-2"
+                                      onClick={() => copyToClipboard(clause.suggestedLanguage)}
+                                    >
+                                      <Copy className="h-4 w-4 mr-1" />
+                                      Copy Language
+                                    </Button>
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <h4 className="font-medium text-gray-700 mb-2">🎯 Why This Matters:</h4>
+                                  <p className="text-sm text-gray-600">{clause.whyItMatters}</p>
                                 </div>
                               </div>
-
-                              <div>
-                                <h4 className="font-medium text-blue-700 mb-2">✅ Recommended Action: {clause.recommendedAction}</h4>
-                                <div className="bg-blue-50 p-3 rounded border border-blue-200">
-                                  <p className="text-sm">"{clause.suggestedLanguage}"</p>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="mt-2"
-                                    onClick={() => copyToClipboard(clause.suggestedLanguage)}
-                                  >
-                                    <Copy className="h-4 w-4 mr-1" />
-                                    Copy Language
-                                  </Button>
-                                </div>
-                              </div>
-
-                              <div>
-                                <h4 className="font-medium text-gray-700 mb-2">🎯 Why This Matters:</h4>
-                                <p className="text-sm text-gray-600">{clause.whyItMatters}</p>
-                              </div>
-                            </div>
-                          </AccordionContent>
-                        </AccordionItem>
-                      ))}
-                    </Accordion>
-                  </CardContent>
-                </Card>
+                            </AccordionContent>
+                          </AccordionItem>
+                        ))}
+                      </Accordion>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Email Template */}
                 <Card>
@@ -445,6 +506,8 @@ Best regards,
           </TabsContent>
         </Tabs>
       </main>
+      
+      <Toaster />
     </div>
   )
 }
