@@ -10,6 +10,7 @@ import { Progress } from './components/ui/progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs'
 import { useToast } from './hooks/use-toast'
 import { Toaster } from './components/ui/toaster'
+import { RedlineView } from './components/RedlineView'
 import { blink } from './blink/client'
 import { analyzeNDA, extractTextFromFile, type AnalysisResult } from './services/ndaAnalysis'
 
@@ -249,9 +250,10 @@ function App() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="upload">Upload & Analyze</TabsTrigger>
             <TabsTrigger value="results" disabled={!analysisResult && !isAnalyzing}>Analysis Results</TabsTrigger>
+            <TabsTrigger value="redline" disabled={!analysisResult}>Redlined Document</TabsTrigger>
           </TabsList>
 
           <TabsContent value="upload" className="space-y-6">
@@ -502,6 +504,15 @@ function App() {
                   </CardContent>
                 </Card>
               </>
+            )}
+          </TabsContent>
+
+          <TabsContent value="redline" className="space-y-6">
+            {analysisResult && (
+              <RedlineView 
+                analysisResult={analysisResult} 
+                originalText={documentText}
+              />
             )}
           </TabsContent>
         </Tabs>
