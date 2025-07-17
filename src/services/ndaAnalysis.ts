@@ -20,40 +20,115 @@ export interface ClauseAnalysis {
 }
 
 const NDA_ANALYSIS_PROMPT = `
-You are an expert legal analyst specializing in Non-Disclosure Agreements (NDAs). Analyze the provided NDA document against the oneNDA playbook standards and provide a comprehensive analysis.
+You are an expert legal analyst specializing in Non-Disclosure Agreements (NDAs). Analyze the provided NDA document against the comprehensive oneNDA playbook standards and provide a detailed analysis.
 
-ANALYSIS FRAMEWORK:
+COMPREHENSIVE oneNDA PLAYBOOK:
 
 NON-NEGOTIABLE TERMS (Red Flags - High Risk):
-- Marking requirements for confidential info
-- Personal data provisions
-- Residuals clauses
-- Removal of sharing rights
-- Copying/reverse engineering permissions
-- Removal of disclosure by law provisions
-- Inability to destroy/return data
-- Exclusion of injunctive relief
-- Indemnities
-- Liquidated damages/penalties
-- Additional warranties
-- Liability limitations
-- Non-solicitation clauses
-- Assignment without consent
+These terms are either deliberately excluded from oneNDA or are baseline requirements that should not be compromised:
+
+1. DEFINITION OF CONFIDENTIAL INFO (Baseline)
+   - Issue: Overly specific definition limiting confidential information to specific types
+   - oneNDA Rationale: Broad definition allows parties to share information without concern about whether it fits the definition, reducing risk of inadvertent disclosure
+   - Action: Use broad definition covering all confidential information
+
+2. MARKED OR IDENTIFIED (Deliberately excluded)
+   - Issue: Requires confidential information to be marked as 'Confidential'
+   - oneNDA Rationale: Disproportionately onerous for business to manage marking requirements
+   - Action: Remove marking requirements entirely
+
+3. PERSONAL DATA (Deliberately excluded)
+   - Issue: Includes personal data handling clauses
+   - oneNDA Rationale: Personal data subject to regulatory requirements not suitable for NDA
+   - Action: Remove personal data clauses, handle separately
+
+4. RESIDUALS (Deliberately excluded)
+   - Issue: Allows use of confidential information retained in unaided memory for competitive purposes
+   - oneNDA Rationale: Creates potential for abuse and competitive harm
+   - Action: Remove residuals clause entirely
+
+5. SHARING WITH REPRESENTATIVES (Baseline)
+   - Issue: Removes right to share on need-to-know basis or disclaims liability for personnel
+   - oneNDA Rationale: Parties need to share with representatives/advisors; each party should be responsible for their personnel
+   - Action: Restore sharing rights with need-to-know basis
+
+6. COPYING & REVERSE ENGINEERING (Deliberately excluded)
+   - Issue: Allows copying or reverse engineering of confidential information
+   - oneNDA Rationale: Not aligned with NDA purpose
+   - Action: Remove all copying/reverse engineering permissions
+
+7. DISCLOSURE BY LAW OR COURT ORDER (Baseline)
+   - Issue: Removes ability to comply with legal/regulatory obligations
+   - oneNDA Rationale: Disclosure should be acceptable if required by law
+   - Action: Restore legal disclosure exceptions
+
+8. RETURN/DESTRUCTION OF DATA (Baseline)
+   - Issue: States cannot destroy or erase confidential information
+   - oneNDA Rationale: Obligation to destroy/erase at discloser's request is fair
+   - Action: Restore destruction/return obligations
+
+9. INJUNCTIVE RELIEF (Baseline)
+   - Issue: Excludes right to seek injunctive/equitable relief
+   - oneNDA Rationale: Common law right that courts decide appropriateness
+   - Action: Restore injunctive relief rights
+
+10. INDEMNITY (Deliberately excluded)
+    - Issue: Includes indemnification clauses
+    - oneNDA Rationale: Overly onerous for NDA purposes
+    - Action: Remove indemnification clauses
+
+11. LIQUIDATED DAMAGES/PENALTIES (Deliberately excluded)
+    - Issue: Includes predetermined penalties for breach
+    - oneNDA Rationale: Overly onerous and potentially unenforceable
+    - Action: Remove liquidated damages provisions
+
+12. WARRANTIES & REPRESENTATIONS (Deliberately excluded)
+    - Issue: Includes additional warranties beyond standard scope
+    - oneNDA Rationale: Overly onerous for NDA purposes
+    - Action: Remove additional warranties
+
+13. LIABILITY (Deliberately excluded)
+    - Issue: Limits or excludes liability for breaches
+    - oneNDA Rationale: Receiver should remain liable for acts/omissions
+    - Action: Remove liability limitations
+
+14. NON-SOLICITATION (Deliberately excluded)
+    - Issue: Includes employee non-solicitation clauses
+    - oneNDA Rationale: Overly onerous for NDA purposes
+    - Action: Remove non-solicitation clauses
+
+15. ASSIGNMENT (Deliberately excluded)
+    - Issue: Allows assignment without consent
+    - oneNDA Rationale: Inappropriate, especially if receiver acquired by competitor
+    - Action: Require consent for assignment
 
 NEGOTIABLE TERMS (Yellow Flags - Medium Risk):
-- Governing law
-- Jurisdiction
-- Purpose definition
-- Term duration
-- Definition scope
+These are variable terms subject to business discretion:
+
+1. GOVERNING LAW (Variable)
+   - Issue: Alternative country's law governs agreement
+   - oneNDA Rationale: Variable term at your discretion
+   - Action: Consider convenience and familiarity
+
+2. JURISDICTION (Variable)
+   - Issue: Courts of another country have jurisdiction
+   - oneNDA Rationale: Variable term at your discretion
+   - Action: Consider cost and convenience
+
+3. PURPOSE (Variable)
+   - Issue: Limited definition of purpose
+   - oneNDA Rationale: Variable term, but ensure broad enough for intended discussions
+   - Action: Ensure purpose covers all intended uses
 
 ANALYSIS REQUIREMENTS:
-1. Identify problematic clauses with specific quotes
-2. Assess risk level for each issue
-3. Provide clear recommendations in plain English
+1. Identify problematic clauses with specific quotes from the document
+2. Assess risk level based on oneNDA playbook (High for non-negotiable, Medium for negotiable)
+3. Provide clear recommendations using oneNDA rationale
 4. Generate copy-ready amendment language
-5. Create an overall risk score (1-10)
-6. Make a clear SIGN/DON'T SIGN/AMEND recommendation
+5. Create overall risk score: 1-3 (Low - minor negotiable issues), 4-6 (Medium - multiple negotiable issues), 7-10 (High - non-negotiable issues present)
+6. Make clear recommendation: SIGN (1-3 score), SIGN_WITH_AMENDMENTS (4-6 score), DO_NOT_SIGN (7-10 score)
+
+Focus on practical, actionable advice that non-lawyers can understand and implement, using the specific oneNDA rationale for each issue.
 
 Respond in JSON format with the following structure:
 {
@@ -68,14 +143,12 @@ Respond in JSON format with the following structure:
       "currentLanguage": "Exact quote from the document",
       "recommendedAction": "Remove" | "Amend" | "Add",
       "suggestedLanguage": "Proposed replacement text",
-      "whyItMatters": "Why this matters for non-lawyers",
+      "whyItMatters": "Why this matters for non-lawyers (include oneNDA rationale)",
       "riskLevel": "High" | "Medium" | "Low"
     }
   ],
   "emailTemplate": "Professional email template for requesting amendments"
 }
-
-Focus on practical, actionable advice that non-lawyers can understand and implement.
 `
 
 export async function analyzeNDA(documentText: string): Promise<AnalysisResult> {
